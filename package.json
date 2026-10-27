@@ -1,0 +1,24 @@
+{
+  "name": "is-this-business-running-ads",
+  "version": "1.0.0",
+  "description": "Check whether businesses are running ads on Meta (Facebook/Instagram), Google (Search/YouTube/Display) and LinkedIn, detect ad pixels on their website, and score them as leads.",
+  "type": "module",
+  "main": "src/main.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/main.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "apify": "^3.7.2",
+    "cheerio": "^1.2.0",
+    "crawlee": "^3.18.2",
+    "got-scraping": "^4.2.2",
+    "playwright": "*",
+    "tldts": "^7.4.19",
+    "tough-cookie": "^5.1.2"
+  },
+  "license": "Apache-2.0"
+}
