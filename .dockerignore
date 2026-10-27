@@ -1,0 +1,9 @@
+.git
+.idea
+.vscode
+node_modules
+storage
+apify_storage
+test
+*.log
+package-lock.json

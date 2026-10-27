@@ -1,0 +1,16 @@
+{
+    "actorSpecification": 1,
+    "name": "is-this-business-running-ads",
+    "title": "Is This Business Running Ads? Meta, Google & LinkedIn Ad Checker",
+    "description": "Check any list of companies, domains or Facebook pages: are they running ads on Facebook/Instagram, Google (Search, YouTube, Display) or LinkedIn right now? Get active ad counts, ad pixels on their website, a 0-100 advertiser score, sales-ready opportunity signals and change alerts.",
+    "version": "1.0",
+    "buildTag": "latest",
+    "minMemoryMbytes": 1024,
+    "maxMemoryMbytes": 8192,
+    "input": "./input_schema.json",
+    "storages": {
+        "dataset": "./dataset_schema.json"
+    },
+    "dockerfile": "./Dockerfile",
+    "readme": "../README.md"
+}

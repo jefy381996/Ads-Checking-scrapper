@@ -1,0 +1,262 @@
+{
+    "title": "Is This Business Running Ads?",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "businesses": {
+            "title": "Businesses to check",
+            "type": "array",
+            "description": "One business per line. Each line can be a domain (<code>allbirds.com</code>), a website URL, a company name (<code>Allbirds</code>), a Facebook page URL (<code>https://www.facebook.com/allbirds</code>), a Meta Ad Library URL, or <code>Company Name | domain.com</code>. A domain and a name together give the most accurate matches.",
+            "editor": "stringList",
+            "prefill": [
+                "Allbirds | allbirds.com",
+                "hubspot.com",
+                "https://www.facebook.com/gymshark"
+            ]
+        },
+        "businessRecords": {
+            "title": "Structured records (for API, Clay, Make, Zapier and n8n)",
+            "type": "array",
+            "description": "Optional. A JSON array of objects with any of these keys: <code>name</code>, <code>domain</code>, <code>website</code>, <code>facebookUrl</code>, <code>facebookPageId</code>, <code>linkedinUrl</code>. Any other keys (for example a CRM <code>id</code>) are copied unchanged into the <code>inputRecord</code> output field, so you can join results back to your list.",
+            "editor": "json",
+            "prefill": []
+        },
+        "importDatasetId": {
+            "title": "Import from another Actor's dataset",
+            "type": "string",
+            "editor": "textfield",
+            "description": "Optional. The ID of an Apify dataset to check, for example the output of <b>Google Maps Scraper</b>, <b>Website Contact Scraper</b> or your own list. The fields <code>title</code>/<code>name</code>, <code>website</code>/<code>domain</code>, <code>facebooks</code> and <code>linkedIns</code> are recognized automatically."
+        },
+        "importMaxItems": {
+            "title": "Max items to import",
+            "type": "integer",
+            "description": "The maximum number of items to read from the imported dataset.",
+            "default": 1000,
+            "minimum": 1,
+            "maximum": 100000
+        },
+        "checkMeta": {
+            "title": "Check Meta (Facebook, Instagram, Messenger, Audience Network)",
+            "type": "boolean",
+            "description": "Look up active ads in the public Meta Ad Library. This is the slowest check because it uses a real browser.",
+            "default": true,
+            "sectionCaption": "Platforms"
+        },
+        "checkGoogle": {
+            "title": "Check Google (Search, YouTube, Display, Shopping, Maps)",
+            "type": "boolean",
+            "description": "Look up the advertiser in the Google Ads Transparency Center.",
+            "default": true
+        },
+        "checkLinkedIn": {
+            "title": "Check LinkedIn",
+            "type": "boolean",
+            "description": "Look up ads in the public LinkedIn Ad Library. Most useful for B2B companies.",
+            "default": true
+        },
+        "scanWebsite": {
+            "title": "Scan website for ad pixels and tech stack",
+            "type": "boolean",
+            "description": "Fetch the homepage and detect tracking pixels: Meta Pixel, Google Ads tag, TikTok, LinkedIn Insight, Microsoft UET, Pinterest, Snap, X, Reddit, Criteo and more. Also detects analytics, the e-commerce platform, and social profile links, which improve platform matching.",
+            "default": true
+        },
+        "scanTagManagers": {
+            "title": "Look inside Google Tag Manager containers",
+            "type": "boolean",
+            "description": "Many pixels are loaded through Google Tag Manager and never appear in the page HTML. When this is on, public GTM and gtag containers are downloaded and scanned too. This costs a little more time and finds many more pixels.",
+            "default": true
+        },
+        "country": {
+            "title": "Country",
+            "type": "string",
+            "description": "Limit ad lookups to ads shown in this country. Use 'All countries' for a global check.",
+            "editor": "select",
+            "default": "ALL",
+            "enum": [
+                "ALL",
+                "US",
+                "GB",
+                "CA",
+                "AU",
+                "NZ",
+                "IE",
+                "DE",
+                "FR",
+                "ES",
+                "IT",
+                "NL",
+                "BE",
+                "SE",
+                "NO",
+                "DK",
+                "FI",
+                "PL",
+                "PT",
+                "AT",
+                "CH",
+                "IN",
+                "PK",
+                "AE",
+                "SA",
+                "SG",
+                "MY",
+                "PH",
+                "ID",
+                "ZA",
+                "NG",
+                "BR",
+                "MX",
+                "AR",
+                "JP",
+                "KR"
+            ],
+            "enumTitles": [
+                "All countries",
+                "United States",
+                "United Kingdom",
+                "Canada",
+                "Australia",
+                "New Zealand",
+                "Ireland",
+                "Germany",
+                "France",
+                "Spain",
+                "Italy",
+                "Netherlands",
+                "Belgium",
+                "Sweden",
+                "Norway",
+                "Denmark",
+                "Finland",
+                "Poland",
+                "Portugal",
+                "Austria",
+                "Switzerland",
+                "India",
+                "Pakistan",
+                "United Arab Emirates",
+                "Saudi Arabia",
+                "Singapore",
+                "Malaysia",
+                "Philippines",
+                "Indonesia",
+                "South Africa",
+                "Nigeria",
+                "Brazil",
+                "Mexico",
+                "Argentina",
+                "Japan",
+                "South Korea"
+            ],
+            "sectionCaption": "Matching and depth"
+        },
+        "activityWindowDays": {
+            "title": "Activity window (days)",
+            "type": "integer",
+            "description": "How recent an ad must be to count as running. Meta always reports ads that are live right now. Google and LinkedIn count an ad as running if it was shown within this many days.",
+            "default": 30,
+            "minimum": 1,
+            "maximum": 365,
+            "unit": "days"
+        },
+        "maxSampleAds": {
+            "title": "Sample ads per platform",
+            "type": "integer",
+            "description": "How many example ads (copy, call to action, landing page and start date) to include for each platform. Set it to 0 to return only verdicts and counts.",
+            "default": 3,
+            "minimum": 0,
+            "maximum": 25
+        },
+        "discoverSocialProfiles": {
+            "title": "Discover Facebook and LinkedIn pages from the website",
+            "type": "boolean",
+            "description": "Use the social links on the business's homepage to find its official Facebook page and LinkedIn company. This is much more accurate than searching by name.",
+            "default": true
+        },
+        "metaKeywordFallback": {
+            "title": "Meta: fall back to keyword search",
+            "type": "boolean",
+            "description": "If no Facebook page is known, search the Ad Library by business name. An advertiser is accepted only when its ads link to the business's domain or its page name closely matches.",
+            "default": true
+        },
+        "usePageCache": {
+            "title": "Meta: remember matched Facebook pages between runs",
+            "type": "boolean",
+            "description": "Caches the Facebook page matched to each business (only pages confirmed by live ads) for 30 days in the <code>ads-checker-page-cache</code> store. Repeat and scheduled runs are faster and cost less.",
+            "default": true
+        },
+        "enableMonitoring": {
+            "title": "Enable change monitoring",
+            "type": "boolean",
+            "description": "Remember results between runs and report what changed: started advertising, stopped advertising, new ads, or a new platform. Run it on a schedule to get alerts.",
+            "default": false,
+            "sectionCaption": "Monitoring and alerts"
+        },
+        "monitoringStoreName": {
+            "title": "Monitoring state store name",
+            "type": "string",
+            "description": "Named key-value store that keeps the previous results. Use a different name for each list you monitor.",
+            "default": "ads-checker-monitor",
+            "editor": "textfield"
+        },
+        "outputOnlyChanges": {
+            "title": "Output only businesses that changed",
+            "type": "boolean",
+            "description": "With monitoring enabled, write a dataset row only when something changed since the last run. This is ideal for Slack, email or webhook alerts. Every business checked is still billed.",
+            "default": false
+        },
+        "maxConcurrency": {
+            "title": "Max concurrency (HTTP checks)",
+            "type": "integer",
+            "description": "How many businesses to check in parallel for the website, Google and LinkedIn checks.",
+            "default": 10,
+            "minimum": 1,
+            "maximum": 50,
+            "sectionCaption": "Performance and proxy"
+        },
+        "metaMaxConcurrency": {
+            "title": "Max concurrency (Meta browser pages)",
+            "type": "integer",
+            "description": "How many Meta Ad Library pages to open in parallel. Higher values need more memory, roughly 600 MB per page.",
+            "default": 3,
+            "minimum": 1,
+            "maximum": 20
+        },
+        "proxyConfiguration": {
+            "title": "Proxy for Meta Ad Library",
+            "type": "object",
+            "description": "Meta often blocks datacenter IP addresses, so residential proxies are strongly recommended for this check.",
+            "editor": "proxy",
+            "prefill": {
+                "useApifyProxy": true,
+                "apifyProxyGroups": [
+                    "RESIDENTIAL"
+                ]
+            },
+            "default": {
+                "useApifyProxy": true,
+                "apifyProxyGroups": [
+                    "RESIDENTIAL"
+                ]
+            }
+        },
+        "httpProxyConfiguration": {
+            "title": "Proxy for websites, Google and LinkedIn",
+            "type": "object",
+            "description": "Used for the lighter HTTP checks. The default Apify datacenter proxy is usually enough.",
+            "editor": "proxy",
+            "prefill": {
+                "useApifyProxy": true
+            },
+            "default": {
+                "useApifyProxy": true
+            }
+        },
+        "includeDebugInfo": {
+            "title": "Include debug info",
+            "type": "boolean",
+            "description": "Add the raw matching candidates and fetched URLs to each result. This is useful for troubleshooting a single business.",
+            "default": false
+        }
+    }
+}
