@@ -1,17 +1,20 @@
 import { Actor, log } from 'apify';
 
 import { normalizeBusinesses, slimImportedItem } from './input.js';
+import { buildInsights } from './insights/index.js';
+import { resolveAssumptions } from './insights/spend.js';
 import { buildSnapshot, diffSnapshots, monitorKey } from './monitor.js';
 import { checkGoogle, emptyGoogleResult } from './platforms/google.js';
 import { checkLinkedIn, emptyLinkedInResult } from './platforms/linkedin.js';
 import { createMetaCrawler, emptyMetaResult, firstMetaRequest } from './platforms/meta.js';
+import { safeFetchMetaApiAds } from './platforms/meta-api.js';
 import { evaluate, outreachSnippet } from './scoring.js';
 import { domainLabel, parseFacebookUrl, parseLinkedInCompany } from './utils/domain.js';
 import { errorMessage, mapWithConcurrency } from './utils/http.js';
 import { emptyWebsiteResult, scanWebsite } from './website/scan.js';
 
 // Pay-per-event names. Configure the same names in Apify Console > Monetization.
-export const EVENTS = { BUSINESS: 'business-checked', META: 'meta-ads-checked' };
+export const EVENTS = { BUSINESS: 'business-checked', META: 'meta-ads-checked', EU: 'eu-insights' };
 const PAGE_CACHE_STORE = 'ads-checker-page-cache';
 const PAGE_CACHE_TTL_MS = 30 * 86400_000;
 
@@ -36,6 +39,12 @@ const cfg = {
     metaMaxConcurrency: clamp(input.metaMaxConcurrency ?? 3, 1, 20),
     includeDebugInfo: input.includeDebugInfo ?? false,
     usePageCache: input.usePageCache ?? true,
+    euInsights: input.euInsights ?? true,
+    // Only from the user's own input: an Actor-level env var would be shared by every user of a public Actor.
+    metaAccessToken: (input.metaAccessToken || '').trim() || null,
+    maxAdsToAnalyze: clamp(input.maxAdsToAnalyze ?? 50, 10, 200),
+    linkedinDetailAds: clamp(input.linkedinDetailAds ?? 5, 0, 20),
+    assumptions: resolveAssumptions(input.cpmAssumptionsEur),
 };
 
 const imported = await importDataset(input.importDatasetId, clamp(input.importMaxItems ?? 1000, 1, 100_000));
@@ -51,7 +60,8 @@ if (!allBusinesses.length) {
 // Respect the user's max charge: assume each business can trigger every event.
 const charging = Actor.getChargingManager();
 const prices = charging.getPricingInfo().perEventPrices ?? {};
-const unitPrice = (prices[EVENTS.BUSINESS] ?? 0) + (cfg.checkMeta ? (prices[EVENTS.META] ?? 0) : 0);
+const unitPrice = (prices[EVENTS.BUSINESS] ?? 0) + (cfg.checkMeta ? (prices[EVENTS.META] ?? 0) : 0)
+    + (cfg.euInsights ? (prices[EVENTS.EU] ?? 0) : 0);
 const maxTotal = charging.getPricingInfo().maxTotalChargeUsd;
 const affordable = unitPrice > 0 && Number.isFinite(maxTotal) ? Math.floor(maxTotal / unitPrice + 1e-9) : Infinity;
 const businesses = allBusinesses.slice(0, affordable);
@@ -90,6 +100,7 @@ const metaProxy = cfg.checkMeta
 const records = new Map();
 let metaPending = 0;
 let httpStageDone = false;
+const finalizing = new Set();
 
 const crawler = cfg.checkMeta
     ? createMetaCrawler({
@@ -100,8 +111,12 @@ const crawler = cfg.checkMeta
         log,
         getContext: (bizId) => records.get(bizId)?.metaCtx ?? null,
         onDone: onMetaDone,
-        // Local development only: point Playwright at an existing Chromium build.
-        launchOptions: process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
+        // Local development and tests only: use an existing Chromium build / extra flags.
+        launchOptions: {
+            ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
+            // JSON array, because flags such as --host-resolver-rules contain spaces.
+            ...(process.env.CHROMIUM_ARGS ? { args: JSON.parse(process.env.CHROMIUM_ARGS) } : {}),
+        },
     })
     : null;
 // The crawler runs with keepAlive while the HTTP stage keeps adding Meta requests.
@@ -142,6 +157,8 @@ if (crawlerRun) {
     await crawlerRun;
     clearInterval(watchdog);
 }
+
+await Promise.all([...finalizing]);
 
 // Safety net: any business whose Meta lookup never reported back.
 for (const rec of records.values()) {
@@ -199,6 +216,7 @@ async function processHttpStage(rec) {
             ? checkLinkedIn(biz, {
                 name: rec.searchName, country: cfg.country, windowDays: cfg.windowDays,
                 maxSampleAds: cfg.maxSampleAds, proxyConfiguration: httpProxy,
+                detailLimit: cfg.euInsights ? cfg.linkedinDetailAds : 0,
             }).catch((err) => ({ ...emptyLinkedInResult(), checked: true, error: errorMessage(err) }))
             : null,
     ]);
@@ -215,6 +233,7 @@ async function startMeta(rec) {
         domains: [biz.domain, ...rec.altDomains].filter(Boolean),
         windowDays: cfg.windowDays,
         maxSampleAds: cfg.maxSampleAds,
+        maxAdsToAnalyze: cfg.maxAdsToAnalyze,
         keywordFallback: cfg.keywordFallback,
         includeDebugInfo: cfg.includeDebugInfo,
         cached: null,
@@ -252,8 +271,15 @@ async function onMetaDone(bizId, result) {
     rec.metaPending = false;
     metaPending--;
     rec.meta = result;
-    if (rec.httpDone) await finalize(rec);
+    // Finalize outside the crawler's request handler: it may call the Meta API
+    // and must not hold a browser page or hit the handler timeout.
+    if (rec.httpDone) track(finalize(rec));
     maybeStopCrawler();
+}
+
+function track(promise) {
+    const p = promise.catch((err) => log.exception(err, 'Finalizing a result failed')).finally(() => finalizing.delete(p));
+    finalizing.add(p);
 }
 
 function maybeStopCrawler() {
@@ -266,9 +292,31 @@ async function finalize(rec) {
     const { biz } = rec;
     const checkedAt = new Date().toISOString();
     const metaRefs = rec.meta?.adRefs ?? [];
-    const meta = rec.meta ? omit(rec.meta, ['adRefs']) : null;
-    const evaluation = evaluate({ meta, google: rec.google, linkedin: rec.linkedin, website: rec.website }, { windowDays: cfg.windowDays });
+    const metaComplete = okCheck(rec.meta) && (rec.meta.adsAnalyzed ?? 0) >= (rec.meta.activeAdsCount ?? 0);
+
+    // EU transparency via the official Meta API (only with the user's token and a known page).
+    let metaApi = null;
+    if (cfg.euInsights && cfg.metaAccessToken && okCheck(rec.meta) && rec.meta.isRunningAds && rec.meta.pageId) {
+        metaApi = await safeFetchMetaApiAds({ accessToken: cfg.metaAccessToken, pageId: rec.meta.pageId, country: cfg.country, maxAds: 300 });
+        metaApi.attempted = true;
+    }
+    // Ad strength is computed from data already collected, so it is always on.
+    const insights = buildInsights({
+        meta: rec.meta, metaApi, linkedin: rec.linkedin,
+        windowDays: cfg.windowDays, maxSampleAds: cfg.maxSampleAds, assumptions: cfg.assumptions,
+    });
+    if (!cfg.euInsights && insights.meta) {
+        delete insights.meta.euTransparency;
+        delete insights.meta.spendEstimate;
+    }
+    const meta = insights.meta ? omit(insights.meta, ['adRefs', 'analyzedAds']) : null;
+    const linkedin = insights.linkedin;
     const businessName = biz.name ?? meta?.pageName ?? rec.website?.siteName ?? rec.searchName ?? null;
+    const evaluation = evaluate(
+        { meta, google: rec.google, linkedin, website: rec.website, insights: insights.summary ? { ...insights.summary, businessName } : null },
+        { windowDays: cfg.windowDays },
+    );
+    const estimate = cfg.euInsights ? insights.summary?.estimatedMonthlySpendEur ?? null : null;
 
     const record = {
         businessName,
@@ -280,16 +328,26 @@ async function finalize(rec) {
         totalActiveAds: evaluation.totalActiveAds,
         advertiserScore: evaluation.advertiserScore,
         adIntensity: evaluation.adIntensity,
+        adStrength: insights.summary?.adsScored ? {
+            accountActivity: insights.summary.accountActivity,
+            daysSinceLastNewAd: insights.summary.daysSinceLastNewAd,
+            topAdStrength: insights.summary.topAdStrength,
+            provenAds: insights.summary.provenAds,
+            promisingAds: insights.summary.promisingAds,
+            adsScored: insights.summary.adsScored,
+        } : null,
+        estimatedMonthlySpendEur: estimate,
+        euReach: cfg.euInsights ? insights.summary?.euReach ?? null : null,
         signalCodes: evaluation.signalCodes,
         signals: evaluation.signals,
         outreachSnippet: outreachSnippet({
-            name: businessName, domain: biz.domain, evaluation, meta, google: rec.google, linkedin: rec.linkedin,
+            name: businessName, domain: biz.domain, evaluation, meta, google: rec.google, linkedin,
         }),
         facebookPageUrl: meta?.pageUrl ?? (biz.facebook?.slug ? `https://www.facebook.com/${biz.facebook.slug}` : null),
         linkedinCompanyUrl: biz.linkedinSlug ? `https://www.linkedin.com/company/${biz.linkedinSlug}` : null,
         meta,
         google: rec.google,
-        linkedin: rec.linkedin,
+        linkedin,
         website: rec.website,
         failedPlatforms: evaluation.failedPlatforms,
         input: typeof biz.input === 'string' ? biz.input : null,
@@ -304,7 +362,7 @@ async function finalize(rec) {
         try {
             const key = monitorKey(biz.key);
             const previous = await monitorStore.getValue(key);
-            const snapshot = buildSnapshot(record, { metaAds: metaRefs, previous });
+            const snapshot = buildSnapshot(record, { metaAds: metaRefs, metaAdsComplete: metaComplete, previous });
             if (evaluation.verdict === 'INCONCLUSIVE') {
                 // Never let a failed check become the baseline; surface it instead of staying silent.
                 record.change = {
@@ -347,6 +405,8 @@ async function finalize(rec) {
         const anySuccess = [rec.website?.reachable, okCheck(meta), okCheck(rec.google), okCheck(rec.linkedin)].some(Boolean);
         if (anySuccess) await Actor.charge({ eventName: EVENTS.BUSINESS });
         if (okCheck(meta)) await Actor.charge({ eventName: EVENTS.META });
+        const euDelivered = estimate || record.euReach || linkedin?.adDetails?.some((d) => d.impressions);
+        if (cfg.euInsights && euDelivered) await Actor.charge({ eventName: EVENTS.EU });
     } catch (err) {
         log.exception(err, `Charging for ${label(biz)} failed`);
     }

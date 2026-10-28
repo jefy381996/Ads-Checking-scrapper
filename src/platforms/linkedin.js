@@ -23,6 +23,7 @@ export function emptyLinkedInResult() {
         countIsLowerBound: false,
         adLibraryUrl: null,
         sampleAds: [],
+        adDetails: [],
         error: null,
     };
 }
@@ -69,7 +70,92 @@ export function parseLinkedInSearch(html) {
     return { ads: [...ads.values()], noResults };
 }
 
-export async function checkLinkedIn(biz, { name, country, windowDays, maxSampleAds, proxyConfiguration }) {
+const DATE_RE = '(?:[A-Z][a-z]{2,8}\\.? \\d{1,2}, \\d{4}|\\d{1,2}/\\d{1,2}/\\d{4}|\\d{4}-\\d{2}-\\d{2})';
+
+/** Text in document order with a space between nodes (cheerio's .text() glues "country" + "Germany"). */
+function spacedText(root) {
+    const out = [];
+    const walk = (node) => {
+        if (node.type === 'text') out.push(node.data);
+        else if (node.type !== 'script' && node.type !== 'style') for (const child of node.children ?? []) walk(child);
+    };
+    if (root) walk(root);
+    return out.join(' ').replace(/\s+/g, ' ').trim();
+}
+
+function parseQuantity(text) {
+    const m = String(text).replace(/,/g, '').trim().match(/^([\d.]+)\s*([kKmM])?$/);
+    if (!m) return null;
+    let n = Number.parseFloat(m[1]);
+    if (/k/i.test(m[2] ?? '')) n *= 1_000;
+    if (/m/i.test(m[2] ?? '')) n *= 1_000_000;
+    return Number.isFinite(n) ? Math.round(n) : null;
+}
+
+function toIsoDate(text) {
+    if (!text || /present|now/i.test(text)) return null;
+    const t = Date.parse(text);
+    return Number.isFinite(t) ? new Date(t).toISOString().slice(0, 10) : null;
+}
+
+/**
+ * Parses an ad detail page (/ad-library/detail/<id>). For ads shown in the EU,
+ * LinkedIn publishes an impression range, run dates and a per-country split.
+ */
+export function parseLinkedInAdDetail(html) {
+    const $ = cheerio.load(html);
+    const text = spacedText($('body')[0] ?? $.root()[0]);
+    let impressions = null;
+    const m = text.match(/impressions?\s*:?\s*(<\s*)?([\d.,]+\s*[kKmM]?)(?:\s*(?:-|–|to)\s*([\d.,]+\s*[kKmM]?))?/i);
+    if (m) {
+        const a = parseQuantity(m[2]);
+        const b = m[3] ? parseQuantity(m[3]) : null;
+        if (a != null) {
+            impressions = m[1] ? { low: 0, high: a } : { low: a, high: b ?? a };
+            impressions.text = m[0].replace(/^impressions?\s*:?\s*/i, '').trim();
+        }
+    }
+    const ran = text.match(new RegExp(`Ran from\\s+(${DATE_RE})\\s+to\\s+(${DATE_RE}|present|now)`, 'i'));
+    const countries = [];
+    const idx = text.search(/impressions?\s+by\s+country|country\s+breakdown|location/i);
+    if (idx >= 0) {
+        for (const c of text.slice(idx, idx + 1500).matchAll(/([A-Z][A-Za-z.'\- ]{2,30}?)\s+(<\s*1|\d{1,3})\s?%/g)) {
+            const name = c[1].replace(/^.*\b(?:country|countries|location|locations)\b\s*/i, '').trim();
+            if (!name || /impressions/i.test(name)) continue;
+            countries.push({ country: name, share: /</.test(c[2]) ? 0.005 : Number(c[2]) / 100 });
+            if (countries.length >= 10) break;
+        }
+    }
+    let paidBy = null;
+    $('*').filter((_, el) => $(el).children().length === 0 && /paid for by/i.test($(el).text())).each((_, el) => {
+        if (paidBy) return;
+        const rest = $(el).text().replace(/.*paid for by\s*:?\s*/i, '').trim();
+        paidBy = rest || $(el).next().text().trim() || null;
+    });
+    return {
+        impressions,
+        ranFrom: ran ? toIsoDate(ran[1]) : null,
+        ranTo: ran ? toIsoDate(ran[2]) : null,
+        topCountries: countries,
+        paidBy: truncate(paidBy, 120),
+    };
+}
+
+async function fetchLinkedInAdDetails(ads, { proxyConfiguration, bizId, limit }) {
+    const details = [];
+    for (const ad of ads.slice(0, limit)) {
+        try {
+            const res = await fetchText(ad.url, { proxyConfiguration, sessionId: `lid_${bizId}_${ad.adId}`, retries: 1, timeoutMs: 20_000 });
+            if (res.statusCode >= 400) continue;
+            details.push({ adId: ad.adId, url: ad.url, ...parseLinkedInAdDetail(res.body) });
+        } catch {
+            // One failed detail page should not fail the whole LinkedIn check.
+        }
+    }
+    return details;
+}
+
+export async function checkLinkedIn(biz, { name, country, windowDays, maxSampleAds, proxyConfiguration, detailLimit = 0 }) {
     const result = emptyLinkedInResult();
     result.checked = true;
     if (!name) {
@@ -93,7 +179,12 @@ export async function checkLinkedIn(biz, { name, country, windowDays, maxSampleA
             return result;
         }
         const { ads } = parseLinkedInSearch(res.body);
-        Object.assign(result, attributeLinkedInAds(ads, { name, slug: biz.linkedinSlug, maxSampleAds }));
+        const attributed = attributeLinkedInAds(ads, { name, slug: biz.linkedinSlug, maxSampleAds: Math.max(maxSampleAds, detailLimit) });
+        Object.assign(result, attributed);
+        if (detailLimit > 0 && attributed.sampleAds.length) {
+            result.adDetails = await fetchLinkedInAdDetails(attributed.sampleAds, { proxyConfiguration, bizId: biz.id, limit: detailLimit });
+        }
+        result.sampleAds = attributed.sampleAds.slice(0, maxSampleAds);
     } catch (err) {
         result.error = errorMessage(err);
     }

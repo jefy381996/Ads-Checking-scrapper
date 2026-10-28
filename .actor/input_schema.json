@@ -185,6 +185,43 @@
             "description": "Caches the Facebook page matched to each business (only pages confirmed by live ads) for 30 days in the <code>ads-checker-page-cache</code> store. Repeat and scheduled runs are faster and cost less.",
             "default": true
         },
+        "euInsights": {
+            "title": "EU reach and spend estimates",
+            "type": "boolean",
+            "description": "For ads shown in the EU, platforms publish reach (Meta) and impression ranges (LinkedIn) under the Digital Services Act. When this is on, the Actor collects that data and models a <b>monthly spend range in EUR</b> from benchmark CPMs. It is an estimate, not actual spend, and only covers EU-delivered ads. Billed as the <code>eu-insights</code> event, and only when EU data is found.",
+            "default": true,
+            "sectionCaption": "Ad intelligence (ad strength, EU reach, spend estimates)",
+            "sectionDescription": "Ad strength (a winning-ad score) is always calculated. EU data and spend estimates are optional."
+        },
+        "metaAccessToken": {
+            "title": "Meta Ad Library API token (for EU reach)",
+            "type": "string",
+            "editor": "textfield",
+            "isSecret": true,
+            "description": "Optional but strongly recommended for EU insights. Meta publishes EU reach, country/age/gender breakdowns and the ad's payer through its official Ad Library API. Get a token at developers.facebook.com after confirming your identity at facebook.com/ID. Without a token, Meta EU reach is usually unavailable."
+        },
+        "maxAdsToAnalyze": {
+            "title": "Meta ads to analyze per business",
+            "type": "integer",
+            "description": "How many live Meta ads to load for ad strength scoring. More ads give a better picture of big advertisers, but each extra 30 ads cost one more page scroll.",
+            "default": 50,
+            "minimum": 10,
+            "maximum": 200
+        },
+        "linkedinDetailAds": {
+            "title": "LinkedIn ad details to open per business",
+            "type": "integer",
+            "description": "How many LinkedIn ad detail pages to open for impression ranges, run dates and the payer. Set it to 0 to skip.",
+            "default": 5,
+            "minimum": 0,
+            "maximum": 20
+        },
+        "cpmAssumptionsEur": {
+            "title": "Your own CPM assumptions (EUR)",
+            "type": "object",
+            "editor": "json",
+            "description": "Optional. Override the benchmark ranges used for spend estimates if you know real CPMs for your market, for example <code>{\"meta\": [6, 14], \"linkedin\": [30, 60], \"frequency\": [1.5, 3]}</code>. By default Meta CPM is weighted by EU country (about \u20ac5-12 in DE/FR/NL, \u20ac3-8 in ES/IT, \u20ac1.5-5 in PL/RO), LinkedIn uses \u20ac25-70, and frequency 1.4-2.6."
+        },
         "enableMonitoring": {
             "title": "Enable change monitoring",
             "type": "boolean",

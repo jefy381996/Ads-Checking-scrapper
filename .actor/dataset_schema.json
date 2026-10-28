@@ -24,18 +24,126 @@
             "display": {
                 "component": "table",
                 "properties": {
-                    "businessName": { "label": "Business", "format": "text" },
-                    "domain": { "label": "Domain", "format": "text" },
-                    "isRunningAds": { "label": "Running ads?", "format": "boolean" },
-                    "verdict": { "label": "Verdict", "format": "text" },
-                    "confidence": { "label": "Confidence", "format": "text" },
-                    "activePlatforms": { "label": "Active on", "format": "array" },
-                    "totalActiveAds": { "label": "Active ads", "format": "number" },
-                    "advertiserScore": { "label": "Score (0-100)", "format": "number" },
-                    "adIntensity": { "label": "Intensity", "format": "text" },
-                    "signalCodes": { "label": "Signals", "format": "array" },
-                    "outreachSnippet": { "label": "Outreach line", "format": "text" },
-                    "checkedAt": { "label": "Checked", "format": "date" }
+                    "businessName": {
+                        "label": "Business",
+                        "format": "text"
+                    },
+                    "domain": {
+                        "label": "Domain",
+                        "format": "text"
+                    },
+                    "isRunningAds": {
+                        "label": "Running ads?",
+                        "format": "boolean"
+                    },
+                    "verdict": {
+                        "label": "Verdict",
+                        "format": "text"
+                    },
+                    "confidence": {
+                        "label": "Confidence",
+                        "format": "text"
+                    },
+                    "activePlatforms": {
+                        "label": "Active on",
+                        "format": "array"
+                    },
+                    "totalActiveAds": {
+                        "label": "Active ads",
+                        "format": "number"
+                    },
+                    "advertiserScore": {
+                        "label": "Score (0-100)",
+                        "format": "number"
+                    },
+                    "adIntensity": {
+                        "label": "Intensity",
+                        "format": "text"
+                    },
+                    "signalCodes": {
+                        "label": "Signals",
+                        "format": "array"
+                    },
+                    "outreachSnippet": {
+                        "label": "Outreach line",
+                        "format": "text"
+                    },
+                    "checkedAt": {
+                        "label": "Checked",
+                        "format": "date"
+                    }
+                }
+            }
+        },
+        "adIntelligence": {
+            "title": "Ad intelligence",
+            "description": "Ad strength, account activity, EU reach and modelled EU spend (estimates, not actual spend).",
+            "transformation": {
+                "fields": [
+                    "businessName",
+                    "domain",
+                    "isRunningAds",
+                    "adStrength",
+                    "euReach",
+                    "estimatedMonthlySpendEur",
+                    "signalCodes"
+                ],
+                "flatten": [
+                    "adStrength",
+                    "estimatedMonthlySpendEur"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "businessName": {
+                        "label": "Business",
+                        "format": "text"
+                    },
+                    "domain": {
+                        "label": "Domain",
+                        "format": "text"
+                    },
+                    "isRunningAds": {
+                        "label": "Running ads?",
+                        "format": "boolean"
+                    },
+                    "adStrength.accountActivity": {
+                        "label": "Account activity",
+                        "format": "text"
+                    },
+                    "adStrength.daysSinceLastNewAd": {
+                        "label": "Days since last new ad",
+                        "format": "number"
+                    },
+                    "adStrength.topAdStrength": {
+                        "label": "Top ad strength",
+                        "format": "number"
+                    },
+                    "adStrength.provenAds": {
+                        "label": "Proven ads",
+                        "format": "number"
+                    },
+                    "euReach": {
+                        "label": "EU reach (Meta)",
+                        "format": "number"
+                    },
+                    "estimatedMonthlySpendEur.low": {
+                        "label": "Est. EU spend/mo low (\u20ac)",
+                        "format": "number"
+                    },
+                    "estimatedMonthlySpendEur.high": {
+                        "label": "Est. EU spend/mo high (\u20ac)",
+                        "format": "number"
+                    },
+                    "estimatedMonthlySpendEur.tier": {
+                        "label": "Spend tier",
+                        "format": "text"
+                    },
+                    "signalCodes": {
+                        "label": "Signals",
+                        "format": "array"
+                    }
                 }
             }
         },
@@ -43,27 +151,82 @@
             "title": "Platform details",
             "description": "Per-platform results and links to the public ad libraries.",
             "transformation": {
-                "fields": ["businessName", "domain", "meta", "google", "linkedin"],
-                "flatten": ["meta", "google", "linkedin"]
+                "fields": [
+                    "businessName",
+                    "domain",
+                    "meta",
+                    "google",
+                    "linkedin"
+                ],
+                "flatten": [
+                    "meta",
+                    "google",
+                    "linkedin"
+                ]
             },
             "display": {
                 "component": "table",
                 "properties": {
-                    "businessName": { "label": "Business", "format": "text" },
-                    "domain": { "label": "Domain", "format": "text" },
-                    "meta.isRunningAds": { "label": "Meta running", "format": "boolean" },
-                    "meta.activeAdsCount": { "label": "Meta active ads", "format": "number" },
-                    "meta.pageName": { "label": "Meta page", "format": "text" },
-                    "meta.matchConfidence": { "label": "Meta match", "format": "text" },
-                    "meta.adLibraryUrl": { "label": "Meta Ad Library", "format": "link" },
-                    "google.isRunningAds": { "label": "Google running", "format": "boolean" },
-                    "google.activeCreativesInWindow": { "label": "Google ads (window)", "format": "number" },
-                    "google.advertiserName": { "label": "Google advertiser", "format": "text" },
-                    "google.lastShownDate": { "label": "Google last shown", "format": "date" },
-                    "google.transparencyUrl": { "label": "Google Transparency", "format": "link" },
-                    "linkedin.isRunningAds": { "label": "LinkedIn running", "format": "boolean" },
-                    "linkedin.adsFound": { "label": "LinkedIn ads", "format": "number" },
-                    "linkedin.adLibraryUrl": { "label": "LinkedIn Ad Library", "format": "link" }
+                    "businessName": {
+                        "label": "Business",
+                        "format": "text"
+                    },
+                    "domain": {
+                        "label": "Domain",
+                        "format": "text"
+                    },
+                    "meta.isRunningAds": {
+                        "label": "Meta running",
+                        "format": "boolean"
+                    },
+                    "meta.activeAdsCount": {
+                        "label": "Meta active ads",
+                        "format": "number"
+                    },
+                    "meta.pageName": {
+                        "label": "Meta page",
+                        "format": "text"
+                    },
+                    "meta.matchConfidence": {
+                        "label": "Meta match",
+                        "format": "text"
+                    },
+                    "meta.adLibraryUrl": {
+                        "label": "Meta Ad Library",
+                        "format": "link"
+                    },
+                    "google.isRunningAds": {
+                        "label": "Google running",
+                        "format": "boolean"
+                    },
+                    "google.activeCreativesInWindow": {
+                        "label": "Google ads (window)",
+                        "format": "number"
+                    },
+                    "google.advertiserName": {
+                        "label": "Google advertiser",
+                        "format": "text"
+                    },
+                    "google.lastShownDate": {
+                        "label": "Google last shown",
+                        "format": "date"
+                    },
+                    "google.transparencyUrl": {
+                        "label": "Google Transparency",
+                        "format": "link"
+                    },
+                    "linkedin.isRunningAds": {
+                        "label": "LinkedIn running",
+                        "format": "boolean"
+                    },
+                    "linkedin.adsFound": {
+                        "label": "LinkedIn ads",
+                        "format": "number"
+                    },
+                    "linkedin.adLibraryUrl": {
+                        "label": "LinkedIn Ad Library",
+                        "format": "link"
+                    }
                 }
             }
         },
@@ -71,20 +234,50 @@
             "title": "Pixels & tech stack",
             "description": "Ad pixels, analytics, e-commerce platform and social profiles found on each website.",
             "transformation": {
-                "fields": ["businessName", "domain", "website"],
-                "flatten": ["website"]
+                "fields": [
+                    "businessName",
+                    "domain",
+                    "website"
+                ],
+                "flatten": [
+                    "website"
+                ]
             },
             "display": {
                 "component": "table",
                 "properties": {
-                    "businessName": { "label": "Business", "format": "text" },
-                    "domain": { "label": "Domain", "format": "text" },
-                    "website.adPixels": { "label": "Ad pixels", "format": "array" },
-                    "website.analytics": { "label": "Analytics", "format": "array" },
-                    "website.ecommercePlatform": { "label": "Platform", "format": "text" },
-                    "website.marketingTools": { "label": "Marketing tools", "format": "array" },
-                    "website.socialProfiles": { "label": "Social profiles", "format": "object" },
-                    "website.finalUrl": { "label": "Final URL", "format": "link" }
+                    "businessName": {
+                        "label": "Business",
+                        "format": "text"
+                    },
+                    "domain": {
+                        "label": "Domain",
+                        "format": "text"
+                    },
+                    "website.adPixels": {
+                        "label": "Ad pixels",
+                        "format": "array"
+                    },
+                    "website.analytics": {
+                        "label": "Analytics",
+                        "format": "array"
+                    },
+                    "website.ecommercePlatform": {
+                        "label": "Platform",
+                        "format": "text"
+                    },
+                    "website.marketingTools": {
+                        "label": "Marketing tools",
+                        "format": "array"
+                    },
+                    "website.socialProfiles": {
+                        "label": "Social profiles",
+                        "format": "object"
+                    },
+                    "website.finalUrl": {
+                        "label": "Final URL",
+                        "format": "link"
+                    }
                 }
             }
         },
@@ -92,20 +285,53 @@
             "title": "Changes (monitoring)",
             "description": "What changed since the previous monitored run.",
             "transformation": {
-                "fields": ["businessName", "domain", "change", "isRunningAds", "activePlatforms", "totalActiveAds"],
-                "flatten": ["change"]
+                "fields": [
+                    "businessName",
+                    "domain",
+                    "change",
+                    "isRunningAds",
+                    "activePlatforms",
+                    "totalActiveAds"
+                ],
+                "flatten": [
+                    "change"
+                ]
             },
             "display": {
                 "component": "table",
                 "properties": {
-                    "businessName": { "label": "Business", "format": "text" },
-                    "domain": { "label": "Domain", "format": "text" },
-                    "change.status": { "label": "Change", "format": "text" },
-                    "change.summary": { "label": "Summary", "format": "text" },
-                    "change.previousCheckedAt": { "label": "Previous check", "format": "date" },
-                    "isRunningAds": { "label": "Running ads now", "format": "boolean" },
-                    "activePlatforms": { "label": "Active on", "format": "array" },
-                    "totalActiveAds": { "label": "Active ads", "format": "number" }
+                    "businessName": {
+                        "label": "Business",
+                        "format": "text"
+                    },
+                    "domain": {
+                        "label": "Domain",
+                        "format": "text"
+                    },
+                    "change.status": {
+                        "label": "Change",
+                        "format": "text"
+                    },
+                    "change.summary": {
+                        "label": "Summary",
+                        "format": "text"
+                    },
+                    "change.previousCheckedAt": {
+                        "label": "Previous check",
+                        "format": "date"
+                    },
+                    "isRunningAds": {
+                        "label": "Running ads now",
+                        "format": "boolean"
+                    },
+                    "activePlatforms": {
+                        "label": "Active on",
+                        "format": "array"
+                    },
+                    "totalActiveAds": {
+                        "label": "Active ads",
+                        "format": "number"
+                    }
                 }
             }
         }

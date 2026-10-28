@@ -5,10 +5,12 @@ Paste a list of companies, domains or Facebook pages and find out in one run:
 - **Are they running ads right now** on **Facebook & Instagram** (Meta Ad Library), **Google Search, YouTube, Display & Shopping** (Google Ads Transparency Center) and **LinkedIn** (LinkedIn Ad Library)?
 - **How many** active ads, since when, on which placements, and with what copy, calls to action and landing pages.
 - **Which ad pixels** are installed on their website: Meta Pixel, Google Ads tag, TikTok, LinkedIn Insight, Microsoft UET (Bing), Pinterest, Snap, X, Reddit, Criteo and more. This includes pixels loaded through **Google Tag Manager**, which most tech-stack tools miss.
+- **Ad strength:** a 0-100 "winning ad" score for every live Meta ad, and whether the account is actively managed or "set and forget".
+- **EU reach and a modelled monthly ad spend range (EUR)** for ads shown in the EU, built from the reach and impression data platforms must publish under the Digital Services Act.
 - **A 0-100 advertiser score**, sales-ready **opportunity signals** and a **personalized first line** for cold outreach.
-- **What changed** since the last run (started or stopped advertising, new ads, new pixels) when you run it on a schedule.
+- **What changed** since the last run (started or stopped advertising, new or switched-off ads, new pixels) when you run it on a schedule.
 
-No login, no cookies and no API keys. It only uses the public ad transparency libraries.
+No login and no cookies. It only uses the public ad transparency libraries. One optional API token (Meta's free Ad Library API) unlocks Meta EU reach data.
 
 ## Who uses it
 
@@ -25,6 +27,7 @@ No login, no cookies and no API keys. It only uses the public ad transparency li
 - **One verdict across platforms.** Most Store tools scrape *one* ad library and return hundreds of rows of raw ads. This Actor returns **one decision-ready row per business**.
 - **Accurate matching, not keyword guessing.** Searching the Meta Ad Library by name returns resellers, fan pages and namesakes. This Actor finds the business's **official Facebook page from its own website**, or attributes ads by their **landing-page domain**, and tells you how it matched (`matchMethod`, `matchConfidence`).
 - **Pixels inside Tag Manager.** GTM and gtag containers are downloaded and inspected, so a Meta Pixel or Google Ads tag that is not visible in the page HTML is still found.
+- **Honest ad intelligence.** Sales and conversions are private to every advertiser, so this Actor never pretends to know them. Ad strength is built from what is public (ad age, duplication, placements, EU reach), and spend is always a **range with its assumptions printed next to it**.
 - **Fair billing.** You are charged per business checked, and **never for checks that fail**.
 - **Built for automation.** Your own fields (CRM IDs and so on) are passed through unchanged, and the output is flat enough for Clay, Make, Zapier, n8n and spreadsheets.
 
@@ -56,8 +59,11 @@ Each business becomes one row. Example (illustrative, shortened):
   "totalActiveAds": 187,
   "advertiserScore": 91,
   "adIntensity": "high",
-  "signalCodes": ["LONG_RUNNING_CREATIVES", "ECOMMERCE_STORE"],
-  "outreachSnippet": "Your oldest live Meta ad has been running for 214 days, so it's clearly working. Are you testing new creative against it?",
+  "adStrength": { "accountActivity": "active_testing", "daysSinceLastNewAd": 2, "topAdStrength": 92, "provenAds": 7, "promisingAds": 11, "adsScored": 50 },
+  "euReach": 4100000,
+  "estimatedMonthlySpendEur": { "low": 18000, "high": 95000, "tier": "large", "platforms": ["meta"], "scope": "EU-delivered ads only", "confidence": "low", "disclaimer": "Modelled estimate, not actual spend. ..." },
+  "signalCodes": ["WINNING_CREATIVES", "LONG_RUNNING_CREATIVES", "BIG_EU_SPENDER", "ECOMMERCE_STORE"],
+  "outreachSnippet": "Your oldest live Meta ad has been running for 214 days, which usually means it's working. Are you testing new creative against it?",
   "facebookPageUrl": "https://www.facebook.com/allbirds/",
   "meta": {
     "isRunningAds": true,
@@ -72,7 +78,19 @@ Each business becomes one row. Example (illustrative, shortened):
     "publisherPlatforms": ["FACEBOOK", "INSTAGRAM", "MESSENGER", "AUDIENCE_NETWORK"],
     "topCallsToAction": ["Shop now", "Learn more"],
     "landingDomains": ["allbirds.com"],
-    "sampleAds": [{ "adArchiveId": "...", "startDate": "...", "body": "...", "ctaText": "Shop now", "linkUrl": "https://www.allbirds.com/...", "adLibraryUrl": "https://www.facebook.com/ads/library/?id=..." }],
+    "sampleAds": [{
+      "adArchiveId": "...", "startDate": "...", "daysRunning": 214, "copies": 9,
+      "strength": 92, "strengthLabel": "proven",
+      "strengthReasons": ["Running 214 days", "Duplicated into 9 ads", "Runs on 4 placements", "EU reach 610k, among this advertiser's top 5%"],
+      "euReach": 610000, "body": "...", "ctaText": "Shop now", "linkUrl": "https://www.allbirds.com/...", "adLibraryUrl": "https://www.facebook.com/ads/library/?id=..."
+    }],
+    "euTransparency": {
+      "source": "meta_ad_library_api", "adsWithEuReach": 38, "totalEuReach": 4100000,
+      "topCountries": [{ "country": "DE", "reach": 1500000, "share": 0.37 }],
+      "audience": { "genderSplit": { "male": 0.41, "female": 0.58, "unknown": 0.01 }, "topAgeRanges": [{ "range": "25-34", "share": 0.34 }] },
+      "payers": ["Allbirds, Inc."], "likelyAgencyPayer": null
+    },
+    "spendEstimate": { "lifetime": { "low": "...", "high": "..." }, "monthly": { "low": "...", "high": "..." }, "coverage": 0.76, "assumptions": { "frequency": [1.4, 2.6], "cpmEur": "weighted by EU country tier ..." } },
     "adLibraryUrl": "https://www.facebook.com/ads/library/?...&view_all_page_id=..."
   },
   "google": {
@@ -97,7 +115,7 @@ Each business becomes one row. Example (illustrative, shortened):
 }
 ```
 
-The dataset has four ready-made views: **Overview**, **Platform details**, **Pixels & tech stack** and **Changes (monitoring)**. Export them as CSV, Excel or JSON, or read them through the API.
+The dataset has five ready-made views: **Overview**, **Ad intelligence**, **Platform details**, **Pixels & tech stack** and **Changes (monitoring)**. Export them as CSV, Excel or JSON, or read them through the API.
 
 ### Verdicts
 
@@ -117,12 +135,46 @@ The dataset has four ready-made views: **Overview**, **Platform details**, **Pix
 | `META_ADS_WITHOUT_PIXEL` | Spending on Meta, but no Meta Pixel detected (or server-side only). |
 | `GOOGLE_ADS_WITHOUT_CONVERSION_TAG` | Spending on Google, but no Google Ads conversion or remarketing tag detected. |
 | `SINGLE_CHANNEL` | Advertises on Meta *or* Google, not both: a cross-channel opportunity. |
-| `LONG_RUNNING_CREATIVES` | Oldest live Meta ad is 90+ days old: a proven winner, or creative fatigue. |
+| `LONG_RUNNING_CREATIVES` | Oldest live Meta ad is 90+ days old in an actively managed account: likely a winner, or creative fatigue. |
+| `SET_AND_FORGET` | No new Meta ad launched in 90+ days and the same creatives keep running: the account looks unmanaged. One of the best agency pitches. |
+| `WINNING_CREATIVES` | At least one live Meta ad scores 70+ on ad strength. |
+| `AGENCY_MANAGED` | The ads are paid for by a different company (from EU payer data), usually an agency or reseller. |
+| `BIG_EU_SPENDER` | Modelled EU spend is in the `large` or `very_large` tier. |
 | `LOW_CREATIVE_VOLUME` | 1-3 live Meta ads: little creative testing. |
 | `SCALING_NOW` | Most live Meta ads started within the activity window. |
 | `B2B_ADVERTISER` | Runs LinkedIn ads. |
 | `ECOMMERCE_STORE` | Shopify, WooCommerce, BigCommerce, Magento, Wix, Squarespace or Webflow store. |
 | `NO_ADS_NO_TRACKING` | Not advertising and no ad pixels: a greenfield prospect. |
+
+## Ad strength, EU reach and spend estimates
+
+**Can it tell you how many sales an ad makes?** No, and neither can any outside tool. Sales and conversions exist only inside the advertiser's own ad account. What *is* public is how advertisers treat their ads, plus the reach data the EU forces platforms to publish. This Actor turns those into two clearly labelled estimates.
+
+### Ad strength (every live Meta ad, all countries)
+
+Advertisers switch off ads that lose money and keep, duplicate and widen the ones that work. Each ad gets a 0-100 score:
+
+| Component | Weight | Why |
+| --- | --- | --- |
+| Days running | up to 45 | Survivors are usually profitable. Ads under 7 days old are "too new to judge". |
+| Copies (identical ads Meta groups together) | up to 25 | One creative running as 10 copies is being scaled. |
+| Placements (Facebook, Instagram, Messenger, Audience Network...) | up to 10 | Winners get rolled out wider. |
+| EU reach, relative to the advertiser's other ads | up to 20 | Only when EU data exists; otherwise the score is rescaled without it. |
+
+Labels: `proven` (70+), `promising` (50-69), `testing` (30-49), `unproven` (<30). Every score comes with `strengthReasons`.
+
+**The set-and-forget correction:** an old ad only means "winner" if someone is managing the account. When an advertiser hasn't launched a new ad in 90+ days (`accountActivity: "static"`), ad age counts for half, and the `SET_AND_FORGET` signal fires instead of `LONG_RUNNING_CREATIVES`. Many small businesses leave a losing ad running for a year, and this keeps them from being labelled "proven".
+
+### EU reach and modelled spend (EU-delivered ads only)
+
+Under the Digital Services Act, platforms publish **reach** (Meta) and **impression ranges** (LinkedIn) for ads shown in the EU. The Actor models a spend range:
+
+- Meta: `EU reach × frequency (1.4-2.6) × CPM`, where the CPM is weighted by EU country (about €5-12 in DE/FR/NL/Nordics, €3-8 in ES/IT/PT, €1.5-5 in PL/RO/HU/BG/HR; €3-11 when the country mix is unknown)
+- LinkedIn: `impression range × CPM (€25-70)`
+
+You get lifetime and monthly run-rate ranges per platform, rounded to two significant figures. When only some ads had data, an extrapolated range is added, together with `coverage` and a `confidence` of `low` or `very_low`. **Treat it as an order of magnitude, not a number to quote to a client.** If you know real CPMs for your market, pass them in **Your own CPM assumptions** (for example `{"meta": [6, 14], "linkedin": [30, 60]}`).
+
+**Getting Meta EU reach:** Meta publishes EU reach, the country/age/gender breakdown and the ad's payer through its free official Ad Library API. Confirm your identity at facebook.com/ID, create an app at developers.facebook.com, generate a user access token, and paste it into **Meta Ad Library API token** (stored encrypted). Short-lived tokens expire within hours, so exchange yours for a long-lived one (about 60 days) for scheduled runs. Without a token, Meta EU reach is usually unavailable, but ad strength still works everywhere.
 
 ## Monitoring and alerts
 
@@ -131,7 +183,7 @@ The dataset has four ready-made views: **Overview**, **Platform details**, **Pix
 3. Create a **Schedule** (for example, daily or weekly) in Apify Console.
 4. Add an **Integration** (Slack, email or webhook) that fires when the run succeeds.
 
-Each change row includes `change.status` (`STARTED_ADVERTISING`, `STOPPED_ADVERTISING`, `NEW_PLATFORM`, `LEFT_PLATFORM`, `NEW_ADS`, `PIXELS_CHANGED`) and a human-readable `change.summary`. A platform that is temporarily blocked keeps its previous state, so you do not get false "stopped advertising" alerts. If every check for a business fails, you get a `CHECK_FAILED` row instead of silence, so a broken monitor never goes unnoticed.
+Each change row includes `change.status` (`STARTED_ADVERTISING`, `STOPPED_ADVERTISING`, `NEW_PLATFORM`, `LEFT_PLATFORM`, `NEW_ADS`, `PIXELS_CHANGED`) and a human-readable `change.summary`. `change.stoppedMetaAds` counts ads switched off since the last run (when both runs saw every live ad). Which ads survive week after week is the strongest public signal of what works. A platform that is temporarily blocked keeps its previous state, so you do not get false "stopped advertising" alerts. If every check for a business fails, you get a `CHECK_FAILED` row instead of silence, so a broken monitor never goes unnoticed.
 
 ## Integrations
 
@@ -148,6 +200,7 @@ Pay per event: you pay only for results.
 | --- | --- |
 | `business-checked` | Once per business where at least one check (website, Google, LinkedIn or Meta) succeeded. |
 | `meta-ads-checked` | Once per business whose Meta Ad Library check succeeded. This is the expensive one: a real browser plus residential proxies. |
+| `eu-insights` | Once per business where EU reach, LinkedIn impression data or a spend estimate was actually returned. Never charged when no EU data exists. |
 
 Turn off **Check Meta** if you only need Google, LinkedIn and pixels. If you set a **maximum cost per run**, the Actor checks only as many businesses as fit in it. See the **Pricing** tab for current prices.
 
@@ -157,7 +210,9 @@ Turn off **Check Meta** if you only need Google, LinkedIn and pixels. If you set
 - **Google** reports advertisers verified in the Ads Transparency Center. An ad counts as running if it was **shown within the activity window** (30 days by default). Lookups by domain are the most reliable.
 - **LinkedIn**: only the first page of results (about 24 ads) is read, so `adsFound` can be a lower bound (`countIsLowerBound: true`).
 - **Pixels** are detected on the homepage and in its tag manager containers. Pixels fired only on later pages, behind a consent banner or server-side (Conversions API) are not visible from the outside.
-- **Spend** is not estimated. The public libraries do not disclose spend for commercial ads, and this Actor does not invent numbers.
+- **Sales and conversions** are not available from any public source, and this Actor does not output them.
+- **Spend** is a model, not a measurement: it covers only EU-delivered ads, uses benchmark CPMs, and can be off by several times. Ads that never reached the EU have no spend estimate at all.
+- **Ad strength** is inferred from behaviour. A new account that just launched its best ad will score it low until the ad has had time to prove itself.
 - **TikTok and Microsoft** ad libraries cover only ads shown in the EU and are not included yet. The TikTok, Microsoft (UET) and other pixels on the website are detected.
 
 ## FAQ
