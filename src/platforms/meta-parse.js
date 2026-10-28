@@ -160,6 +160,8 @@ export function parseMetaAd(raw) {
         landingDomain: registrableDomain(linkUrl) ?? captionDomain(s.caption ?? card.caption),
         imageUrl: image,
         collationCount: Number.isFinite(raw.collation_count) ? raw.collation_count : null,
+        // EU (DSA) reach, if Meta includes it in the page data. The official API is the reliable source.
+        euTotalReach: Number.isFinite(raw.eu_total_reach) && raw.eu_total_reach > 0 ? raw.eu_total_reach : null,
         adLibraryUrl: `${AD_LIBRARY}?id=${id}`,
     };
 }
@@ -284,5 +286,7 @@ export function summarizeMetaAds(rawAds, { totalCount, domCount, hasNextPage, wi
                 adArchiveId, startDate, publisherPlatforms, displayFormat, title, body, ctaText, linkUrl, imageUrl, adLibraryUrl,
             })),
         adRefs: ads.map((a) => ({ id: a.adArchiveId, start: a.startDate })),
+        // Internal: all parsed ads, used for ad strength and spend models (not written to output).
+        analyzedAds: ads,
     };
 }

@@ -12,8 +12,11 @@ export function monitorKey(businessKey) {
     return `biz-${createHash('sha1').update(businessKey).digest('hex').slice(0, 32)}`;
 }
 
-/** `metaAds` is [{ id, start }] for the live Meta ads analyzed in this run. */
-export function buildSnapshot(record, { metaAds = [], previous = null }) {
+/**
+ * `metaAds` is [{ id, start }] for the live Meta ads analyzed in this run;
+ * `metaAdsComplete` says whether that list covers every live ad.
+ */
+export function buildSnapshot(record, { metaAds = [], metaAdsComplete = false, previous = null }) {
     const platforms = {};
     for (const p of PLATFORMS) {
         const r = record[p];
@@ -30,6 +33,7 @@ export function buildSnapshot(record, { metaAds = [], previous = null }) {
         platforms,
         isRunningAds: Object.values(platforms).some((x) => x.isRunningAds),
         metaAds: metaOk ? metaAds.slice(0, 500) : (previous?.metaAds ?? []),
+        metaAdsComplete: metaOk ? Boolean(metaAdsComplete) && metaAds.length <= 500 : Boolean(previous?.metaAdsComplete),
         adPixels: record.website?.reachable ? record.website.adPixels : (previous?.adPixels ?? []),
     };
 }
@@ -49,6 +53,7 @@ export function diffSnapshots(prev, cur) {
             startedOn: [],
             stoppedOn: [],
             newMetaAds: 0,
+            stoppedMetaAds: null,
             adCountDelta: 0,
             newAdPixels: [],
             removedAdPixels: [],
@@ -69,6 +74,11 @@ export function diffSnapshots(prev, cur) {
     const newMetaAds = prev.platforms?.meta && Number.isFinite(since)
         ? (cur.metaAds ?? []).filter((a) => !prevIds.has(a.id) && Date.parse(a.start ?? '') >= since).length
         : 0;
+    // Switched-off ads can only be counted when both runs saw every live ad.
+    const curIds = new Set((cur.metaAds ?? []).map((a) => a.id));
+    const stoppedMetaAds = prev.metaAdsComplete && cur.metaAdsComplete
+        ? (prev.metaAds ?? []).filter((a) => !curIds.has(a.id)).length
+        : null;
     const prevPixels = new Set(prev.adPixels ?? []);
     const curPixels = new Set(cur.adPixels ?? []);
     const newAdPixels = [...curPixels].filter((p) => !prevPixels.has(p));
@@ -86,6 +96,7 @@ export function diffSnapshots(prev, cur) {
     if (startedOn.length) parts.push(`started on ${startedOn.join(', ')}`);
     if (stoppedOn.length) parts.push(`stopped on ${stoppedOn.join(', ')}`);
     if (newMetaAds) parts.push(`${newMetaAds} new Meta ad${newMetaAds === 1 ? '' : 's'}`);
+    if (stoppedMetaAds) parts.push(`${stoppedMetaAds} Meta ad${stoppedMetaAds === 1 ? '' : 's'} switched off`);
     if (adCountDelta) parts.push(`active ads ${adCountDelta > 0 ? '+' : ''}${adCountDelta}`);
     if (newAdPixels.length) parts.push(`new pixels: ${newAdPixels.join(', ')}`);
     if (removedAdPixels.length) parts.push(`removed pixels: ${removedAdPixels.join(', ')}`);
@@ -97,6 +108,7 @@ export function diffSnapshots(prev, cur) {
         startedOn,
         stoppedOn,
         newMetaAds,
+        stoppedMetaAds,
         adCountDelta,
         newAdPixels,
         removedAdPixels,

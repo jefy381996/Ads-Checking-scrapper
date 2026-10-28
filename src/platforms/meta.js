@@ -140,7 +140,8 @@ export function createMetaCrawler({ proxyConfiguration, maxConcurrency, country,
                 return;
             }
 
-            const state = await collectAdLibrary(page, html, bucket, { wantAds: label === 'ADLIB_KEYWORD' ? 60 : Math.max(ctx.maxSampleAds, 30) });
+            const wantAds = label === 'ADLIB_KEYWORD' ? 60 : Math.max(ctx.maxSampleAds, ctx.maxAdsToAnalyze ?? 30, 30);
+            const state = await collectAdLibrary(page, html, bucket, { wantAds });
 
             if (label === 'ADLIB_KEYWORD') {
                 const ads = [...state.ads.values()].map(parseMetaAd);
@@ -219,9 +220,12 @@ async function collectAdLibrary(page, html, bucket, { wantAds }) {
     const state = newCollectState();
     collectFromDocuments(parseJsonDocuments(html), state);
 
+    // Each scroll loads about 30 more ads; deeper analysis costs more bandwidth.
+    const maxScrolls = Math.min(8, Math.ceil(wantAds / 30) + 1);
+    const waitMax = Math.min(40_000, WAIT_MAX_MS + 3_000 * maxScrolls);
     const started = Date.now();
     let scrolls = 0;
-    while (Date.now() - started < WAIT_MAX_MS) {
+    while (Date.now() - started < waitMax) {
         await Promise.allSettled(bucket.pending.splice(0));
         for (const text of bucket.texts.splice(0)) collectFromDocuments(parseJsonDocuments(text), state);
         const bodyText = await page.evaluate(() => document.body?.innerText?.slice(0, 20000) ?? '').catch(() => '');
@@ -233,7 +237,7 @@ async function collectAdLibrary(page, html, bucket, { wantAds }) {
         if (state.noResults && !state.ads.size) break;
         if (haveCount && (state.ads.size >= Math.min(wantAds, state.totalCount ?? state.domCount ?? 0) || state.hasNextPage === false)) break;
         if (state.ads.size >= wantAds) break;
-        if (state.ads.size && state.hasNextPage && scrolls < 3) {
+        if (state.ads.size && state.hasNextPage && scrolls < maxScrolls) {
             scrolls++;
             await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight)).catch(() => {});
         }
